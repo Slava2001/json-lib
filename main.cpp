@@ -41,31 +41,31 @@ typedef struct sdml_json_node {
     struct sdml_json_node *parent;
 } sdml_json_node;
 
-// typedef struct sdml_json {
-//     struct mem_ctrl mem;
-//     sdml_json_node **root;
-// } sdml_json;
-
-/// @brief Parse JSON string into tree.
-/// @param[out] root poiter to root of JSON tree.
-/// @param json input JSON string (must be null-terminated).
-/// @param buff buffer.
-/// @param buff_size buffer size.
-/// @return number of elements on success, negative code on error.
-int sdml_parse(sdml_json_node **root, const char *json, sdml_json_node *buff, unsigned buff_size);
-
-/// @brief Print JSON tree into string.
-/// @param root poiter to root of JSON tree.
-/// @param buff buffer to storage JSON string.
-/// @param buff_size buffer size.
-/// @return string len on success, negative code on error.
-int sdml_print(const sdml_json_node *root, char *buff, unsigned buff_size);
-
 struct mem_ctrl {
     sdml_json_node *buff;
     unsigned used_count;
     unsigned buff_size;
 };
+
+typedef struct sdml_json {
+    struct mem_ctrl mem;
+    sdml_json_node *root;
+} sdml_json;
+
+/// @brief Parse JSON string into tree.
+/// @param[inout] ctx poiter to parser context.
+/// @param json input JSON string (must be null-terminated).
+/// @param buff buffer.
+/// @param buff_size buffer size.
+/// @return number of elements on success, negative code on error.
+int sdml_parse(sdml_json *ctx, const char *json, sdml_json_node *buff, unsigned buff_size);
+
+/// @brief Print JSON tree into string.
+/// @param[in] ctx poiter to parser context.
+/// @param buff buffer to storage JSON string.
+/// @param buff_size buffer size.
+/// @return string len on success, negative code on error.
+int sdml_print(const sdml_json *ctx, char *buff, unsigned buff_size);
 
 int init_mem_ctrl(struct mem_ctrl *ctrl, sdml_json_node *buff, unsigned buff_size) {
     ctrl->buff = buff;
@@ -102,18 +102,17 @@ sdml_json_node *create_node(struct mem_ctrl *mem, sdml_json_node *top)
 
 int parse_str(struct string *str, const char *json);
 
-int sdml_parse(sdml_json_node **root, const char *json, sdml_json_node *buff, unsigned buff_size)
+int sdml_parse(sdml_json *ctx, const char *json, sdml_json_node *buff, unsigned buff_size)
 {
-    struct mem_ctrl mem;
-    init_mem_ctrl(&mem, buff, buff_size);
+    init_mem_ctrl(&ctx->mem, buff, buff_size);
 
-    *root = alloc_node(&mem);
-    if (!*root) {
+    ctx->root = alloc_node(&ctx->mem);
+    if (!ctx->root) {
         return -1;
     }
 
     sdml_json_node *top = NULL;
-    sdml_json_node *current = *root;
+    sdml_json_node *current = ctx->root;
     bool is_key = false;
     current->key.len = -1;
 
@@ -129,7 +128,7 @@ int sdml_parse(sdml_json_node **root, const char *json, sdml_json_node *buff, un
         case '[':
 
             if (top && top->type == ARRAY) {
-                current = create_node(&mem, top);
+                current = create_node(&ctx->mem, top);
                 if (!current) {
                     return -1;
                 }
@@ -160,7 +159,7 @@ int sdml_parse(sdml_json_node **root, const char *json, sdml_json_node *buff, un
             i += l - 1;
 
             if (is_key) {
-                current = create_node(&mem, top);
+                current = create_node(&ctx->mem, top);
                 if (!current) {
                     return -1;
                 }
@@ -226,7 +225,7 @@ int parse_str(struct string *str, const char *json)
     return -1;
 }
 
-int sdml_print(const sdml_json_node *root, char *buff, unsigned buff_size)
+int sdml_print(const sdml_json *ctx, char *buff, unsigned buff_size)
 {
     return 0;
 }
@@ -275,19 +274,19 @@ int main()
     const char *json_str =  " {  \"user\" : \"Slava\", \"my_array\" : [ \"el_1\", \"el_2\", \"el_3\", { \"key\" : \"val\"}, { \"key\" : \"val\"}, [\"el_1\", \"el_2\", \"el_3\"], [\"el_1\", \"el_2\", \"el_3\"] ], \"sub_object\" : { \"obj_par\" : \"value\", \"subsub_object\" : { \"obj_par\" : \"value\" } } }  ";
 
     // parse
-    sdml_json_node *json_tree;
+    sdml_json json = {};
     sdml_json_node json_nodes[100];
-    int real_cnt = sdml_parse(&json_tree, json_str, json_nodes, 100);
+    int real_cnt = sdml_parse(&json, json_str, json_nodes, 100);
     if (real_cnt < 0) {
         printf("Failed to parse JSON\n");
         return -1;
     }
 
-    debug_print(json_tree, 0);
+    debug_print(json.root, 0);
 
     // print
     char buff_str[1024] = { };
-    int str_len = sdml_print(json_tree, buff_str, 1024);
+    int str_len = sdml_print(&json, buff_str, 1024);
     if (str_len < 0) {
         printf("Failed to print JSON\n");
         return -1;
