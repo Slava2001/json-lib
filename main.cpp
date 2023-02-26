@@ -2,12 +2,11 @@
 #include <stdbool.h>
 #include <string.h>
 
-
 #define MAX_OBJECT_CHILDES 100
 
 struct string {
     const char *ptr;
-    unsigned len;
+    int len;
 };
 
 struct sdml_json_node;
@@ -17,10 +16,17 @@ struct object {
 };
 
 enum sdml_node_type {
+    UNDEFINE,
     OBJECT,
     ARRAY,
     STRING,
     NUMBER
+};
+
+struct array {
+    // enum sdml_node_type type; // TODO: add type check
+    struct sdml_json_node *elements[MAX_OBJECT_CHILDES];
+    unsigned element_count;
 };
 
 typedef struct sdml_json_node {
@@ -29,10 +35,16 @@ typedef struct sdml_json_node {
     union {
         struct string string;
         struct object object;
+        struct array array;
     };
 
     struct sdml_json_node *parent;
 } sdml_json_node;
+
+// typedef struct sdml_json {
+//     struct mem_ctrl mem;
+//     sdml_json_node **root;
+// } sdml_json;
 
 /// @brief Parse JSON string into tree.
 /// @param[out] root poiter to root of JSON tree.
@@ -70,6 +82,24 @@ sdml_json_node *alloc_node(struct mem_ctrl *ctrl) {
     ctrl->used_count++;
     return &ctrl->buff[ctrl->used_count];
 }
+
+sdml_json_node *create_node(struct mem_ctrl *mem, sdml_json_node *top)
+{
+    sdml_json_node *n = alloc_node(mem);
+    if (!n) {
+        return NULL;
+    }
+    if (top->type != OBJECT && top->type != ARRAY) {
+        return NULL;
+    }
+    if (top->object.childe_count == MAX_OBJECT_CHILDES) {
+        return NULL;
+    }
+    top->object.childe[top->object.childe_count] = n;
+    top->object.childe_count++;
+    return n;
+}
+
 int parse_str(struct string *str, const char *json);
 
 int sdml_parse(sdml_json_node **root, const char *json, sdml_json_node *buff, unsigned buff_size)
@@ -85,6 +115,7 @@ int sdml_parse(sdml_json_node **root, const char *json, sdml_json_node *buff, un
     sdml_json_node *top = NULL;
     sdml_json_node *current = *root;
     bool is_key = false;
+    current->key.len = -1;
 
     for (int i = 0; json[i]; i++) {
         switch (json[i]) {
@@ -95,16 +126,26 @@ int sdml_parse(sdml_json_node **root, const char *json, sdml_json_node *buff, un
             is_key = true;
             break;
         case '{':
-            if (is_key) {
+        case '[':
+
+            if (top && top->type == ARRAY) {
+                current = create_node(&mem, top);
+                if (!current) {
+                    return -1;
+                }
+                current->parent = top;
+                current->key.len = -1;
+            } else if (is_key) {
                 return -1; // object can not be key
             }
 
-            current->type = OBJECT;
+            current->type = json[i] == '{'? OBJECT: ARRAY;
             top = current;
             current = NULL;
             is_key = true;
             break;
         case '}':
+        case ']':
             if (current) {
                 return -1; // expect that all subobject closed
             }
@@ -119,21 +160,19 @@ int sdml_parse(sdml_json_node **root, const char *json, sdml_json_node *buff, un
             i += l - 1;
 
             if (is_key) {
-                sdml_json_node *n = alloc_node(&mem);
-                if (!n) {
+                current = create_node(&mem, top);
+                if (!current) {
                     return -1;
                 }
-                current = n;
-                if (top->type != OBJECT) {
-                    return -1;
+                if (top->type == ARRAY) {
+                    current->key.len = -1;
+                    current->type = STRING;
+                    current->string = tmp;
+                    current = NULL;
+                } else {
+                    current->parent = top;
+                    current->key = tmp;
                 }
-                if (top->object.childe_count == MAX_OBJECT_CHILDES) {
-                    return -1;
-                }
-                top->object.childe[top->object.childe_count] = n;
-                top->object.childe_count++;
-                current->key = tmp;
-                current->parent = top;
             } else {
                 current->type = STRING;
                 current->string = tmp;
@@ -145,6 +184,18 @@ int sdml_parse(sdml_json_node **root, const char *json, sdml_json_node *buff, un
         case '+':
         case '0'-'9':
             // TODO: number parse
+            return -1;
+            break;
+        case 't':
+        case 'T':
+        case 'f':
+        case 'F':
+            // TODO: bool parse
+            return -1;
+            break;
+        case 'N':
+        case 'n':
+            // TODO: NULL parse
             return -1;
             break;
         case ' ':
@@ -180,24 +231,39 @@ int sdml_print(const sdml_json_node *root, char *buff, unsigned buff_size)
     return 0;
 }
 
-void debug_print(const sdml_json_node *root, int lvl) {
-
-    for (int i = 0; i < lvl; i++) printf("     ");
-
-    printf("\"%.*s\" : ", root->key.len, root->key.ptr);
+void debug_print(const sdml_json_node *root, int lvl)
+{
+    for (int i = 0; i < lvl; i++) printf("  ");
+    if (root->key.len >= 0) {
+        printf("\"%.*s\" : ", root->key.len, root->key.ptr);
+    }
     switch (root->type) {
     case OBJECT:
         printf("{\n");
         for (int i = 0; i < root->object.childe_count; i++) {
             debug_print(root->object.childe[i], lvl+1);
+            if (i < root->object.childe_count - 1) {
+                printf(",");
+            }
+            printf("\n");
         }
-        for (int i = 0; i < lvl; i++) printf("     ");
-        printf("}\n");
+        for (int i = 0; i < lvl; i++) printf("  ");
+        printf("}");
         break;
     case STRING:
-        printf("\"%.*s\"\n", root->string.len, root->string.ptr);
+        printf("\"%.*s\"", root->string.len, root->string.ptr);
         break;
     case ARRAY:
+        printf("[\n");
+        for (int i = 0; i < root->object.childe_count; i++) {
+            debug_print(root->object.childe[i], lvl+1);
+            if (i < root->object.childe_count - 1) {
+                printf(",");
+            }
+            printf("\n");
+        }
+        for (int i = 0; i < lvl; i++) printf("  ");
+        printf("]");
         break;
     case NUMBER:
         break;
@@ -206,7 +272,7 @@ void debug_print(const sdml_json_node *root, int lvl) {
 
 int main()
 {
-    const char *json_str =  " {      \"user\" : \"Slava\", \"sub_object\" : { \"obj_par\" : \"value\", \"subsub_object\" : { \"obj_par\" : \"value\" } } }  ";
+    const char *json_str =  " {  \"user\" : \"Slava\", \"my_array\" : [ \"el_1\", \"el_2\", \"el_3\", { \"key\" : \"val\"}, { \"key\" : \"val\"}, [\"el_1\", \"el_2\", \"el_3\"], [\"el_1\", \"el_2\", \"el_3\"] ], \"sub_object\" : { \"obj_par\" : \"value\", \"subsub_object\" : { \"obj_par\" : \"value\" } } }  ";
 
     // parse
     sdml_json_node *json_tree;
@@ -218,7 +284,6 @@ int main()
     }
 
     debug_print(json_tree, 0);
-
 
     // print
     char buff_str[1024] = { };
