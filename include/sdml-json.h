@@ -1,42 +1,53 @@
 #ifndef SDML_JSON_LIB
 #define SDML_JSON_LIB
+
 #include <stdbool.h>
-#include <string.h>
 
 #define MAX_OBJECT_CHILDES 100
 
-struct string {
+struct sdml_string {
     const char *ptr;
     int len;
 };
 
 struct sdml_json_node;
-struct object {
+struct sdml_object {
     struct sdml_json_node *childe[MAX_OBJECT_CHILDES];
     unsigned childe_count;
 };
 
 enum sdml_node_type {
-    UNDEFINE,
-    OBJECT,
-    ARRAY,
-    STRING,
-    NUMBER
+    SDML_UNDEFINE,
+    SDML_OBJECT,
+    SDML_ARRAY,
+    SDML_STRING,
+    SDML_NUMBER,
+    SDML_BOOLEAN,
+    SDML_NULL
 };
 
-struct array {
-    // enum sdml_node_type type; // TODO: add type check
+struct sdml_array {
     struct sdml_json_node *elements[MAX_OBJECT_CHILDES];
     unsigned element_count;
 };
 
+struct sdml_number {
+    double value;
+};
+
+struct sdml_bool {
+    bool value;
+};
+
 typedef struct sdml_json_node {
-    struct string key;
+    struct sdml_string key;
     enum sdml_node_type type;
     union {
-        struct string string;
-        struct object object;
-        struct array array;
+        struct sdml_string string;
+        struct sdml_object object;
+        struct sdml_array array;
+        struct sdml_number number;
+        struct sdml_bool boolean;
     };
 
     struct sdml_json_node *parent;

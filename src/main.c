@@ -4,7 +4,36 @@
 
 int main()
 {
-    const char *json_str =  " {  \"user\" : \"Slava\", \"my_array\" : [ \"el_1\", \"el_2\", \"el_3\", { \"key\" : \"val\"}, { \"key\" : \"val\"}, [\"el_1\", \"el_2\", \"el_3\"], [\"el_1\", \"el_2\", \"el_3\"] ], \"sub_object\" : { \"obj_par\" : \"value\", \"subsub_object\" : { \"obj_par\" : \"value\" } } }  ";
+    const char *json_str =  "["
+                                "{"
+                                    "\"_id\": \"5973782bdb9a930533b05cb2\","
+                                    "\"isActive\": true,"
+                                    "\"balance\": \"$1,446.35\","
+                                    "\"age\": 32,"
+                                    "\"eyeColor\": \"green\","
+                                    "\"name\": \"Logan Keller\","
+                                    "\"gender\": \"male\","
+                                    "\"company\": \"ARTIQ\","
+                                    "\"email\": \"logankeller@artiq.com\","
+                                    "\"phone\": \"+1 (952) 533-2258\","
+                                    "\"friends\": ["
+                                    "{"
+                                        "\"id\": 0,"
+                                        "\"name\": \"Colon Salazar\""
+                                    "},"
+                                    "{"
+                                        "\"id\": 1,"
+                                        "\"name\": \"French Mcneil\""
+                                    "},"
+                                    "{"
+                                        "\"id\": 2,"
+                                        "\"name\": \"Carol Martin\""
+                                    "}"
+                                    "],"
+                                    "\"favoriteFruit\": \"banana\","
+                                    "\"favoriteBook\": null"
+                                "}"
+                            "]";
 
     // parse
     sdml_json json = {};
